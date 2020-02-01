@@ -60,7 +60,7 @@ td_create <- function(provider = getOption("taxadb_default_provider", "itis"),
                       overwrite = FALSE,
                       lines = 1e5,
                       dbdir =  taxadb_dir(),
-                      db = td_connect(dbdir)
+                      db = td_connect(dbdir, read_only = FALSE)
                       ){
 
   if(!dir.exists(dbdir))

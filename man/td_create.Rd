@@ -11,7 +11,7 @@ td_create(
   overwrite = FALSE,
   lines = 1e+05,
   dbdir = taxadb_dir(),
-  db = td_connect(dbdir)
+  db = td_connect(dbdir, readonly = FALSE)
 )
 }
 \arguments{

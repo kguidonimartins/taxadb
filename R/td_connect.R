@@ -5,6 +5,10 @@
 #'   `taxadb` will select the first one of those it finds available if a
 #'   driver is not set. This fallback can be overwritten either by explicit
 #'   argument or by setting the environmental variable `TAXADB_DRIVER`.
+#' @param read_only Should we create a read-only database? This allows multiple
+#' connections to the on-disk database from separate R processes / sessions.
+#' Only applies to duckdb.  Note: td_create() will toggle this off by default
+#' in order to import the initial data.
 #' @return Returns a `src_dbi` connection to the default duckdb database
 #' @details This function provides a default database connection for
 #' `taxadb`. Note that you can use `taxadb` with any DBI-compatible database
@@ -35,25 +39,33 @@
 #'
 #' }
 td_connect <- function(dbdir = taxadb_dir(),
-                       driver = Sys.getenv("TAXADB_DRIVER")){
+                       driver = Sys.getenv("TAXADB_DRIVER"),
+                       read_only = TRUE){
 
   dbname <- file.path(dbdir, "database")
-  db <- mget("td_db", envir = taxadb_cache, ifnotfound = NA)[[1]]
-  if (inherits(db, "DBIConnection")) {
-    if (DBI::dbIsValid(db)) {
-      return(db)
+
+  if(read_only){
+    ## Don't load from cache if it is a write-connection (i.e. for td_create)
+    db <- mget("td_db", envir = taxadb_cache, ifnotfound = NA)[[1]]
+    if (inherits(db, "DBIConnection")) {
+      if (DBI::dbIsValid(db)) {
+        return(db)
+      }
     }
   }
-
   dir.create(dbname, showWarnings = FALSE, recursive = TRUE)
 
-  db <- db_driver(dbname, driver)
+  db <- db_driver(dbname, driver, read_only)
   #db <- monetdblite_connect(dbname)
-  assign("td_db", db, envir = taxadb_cache)
+
+  if(read_only){
+    ## Only cache read_only connections
+    assign("td_db", db, envir = taxadb_cache)
+  }
   db
 }
 
-db_driver <- function(dbname, driver = Sys.getenv("TAXADB_DRIVER")){
+db_driver <- function(dbname, driver = Sys.getenv("TAXADB_DRIVER"), read_only = TRUE){
 
   ## Evaluate capabilities in reverse-priorty order
   drivers <- "dplyr"
@@ -66,8 +78,7 @@ db_driver <- function(dbname, driver = Sys.getenv("TAXADB_DRIVER")){
     MonetDBLite <- getExportedValue("MonetDBLite", "MonetDBLite")
     drivers <- c("MonetDBLite", drivers)
   }
-  ## duckdb lacks necessary stability
-  ## https://github.com/cwida/duckdb/issues/58
+  ## duckdb may still be slower than MonetDBLite due to threading?
   if (requireNamespace("duckdb", quietly = TRUE)){
     duckdb <- getExportedValue("duckdb", "duckdb")
     drivers <- c("duckdb", drivers)
@@ -78,7 +89,8 @@ db_driver <- function(dbname, driver = Sys.getenv("TAXADB_DRIVER")){
 
 
   db <- switch(driver,
-         duckdb = DBI::dbConnect(duckdb( dbdir = file.path(dbname,"duckdb")),
+         duckdb = DBI::dbConnect(duckdb( dbdir = file.path(dbname,"duckdb"),
+                                         read_only = read_only),
                                  dbname = file.path(dbname,"duckdb")),
          MonetDBLite = monetdblite_connect(file.path(dbname,"MonetDBLite")),
          RSQLite = DBI::dbConnect(SQLite(),

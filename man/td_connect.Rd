@@ -4,7 +4,11 @@
 \alias{td_connect}
 \title{Connect to the taxadb database}
 \usage{
-td_connect(dbdir = taxadb_dir(), driver = Sys.getenv("TAXADB_DRIVER"))
+td_connect(
+  dbdir = taxadb_dir(),
+  driver = Sys.getenv("TAXADB_DRIVER"),
+  read_only = TRUE
+)
 }
 \arguments{
 \item{dbdir}{Path to the database.}
@@ -13,6 +17,11 @@ td_connect(dbdir = taxadb_dir(), driver = Sys.getenv("TAXADB_DRIVER"))
 \code{taxadb} will select the first one of those it finds available if a
 driver is not set. This fallback can be overwritten either by explicit
 argument or by setting the environmental variable \code{TAXADB_DRIVER}.}
+
+\item{read_only}{Should we create a read-only database? This allows multiple
+connections to the on-disk database from separate R processes / sessions.
+Only applies to duckdb.  Note: td_create() will toggle this off by default
+in order to import the initial data.}
 }
 \value{
 Returns a \code{src_dbi} connection to the default duckdb database

@@ -52,6 +52,9 @@ td_connect <- function(dbdir = taxadb_dir(),
         return(db)
       }
     }
+  } else {
+    ## make sure any previous connection is closed first.
+    td_disconnect()
   }
   dir.create(dbname, showWarnings = FALSE, recursive = TRUE)
 

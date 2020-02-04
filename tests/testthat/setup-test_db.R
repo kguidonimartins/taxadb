@@ -10,7 +10,10 @@ test_db <- file.path(tempdir(), "taxadb")
 Sys.setenv(TAXADB_HOME=test_db)
 
 
-print(paste("Testing using backend", class(td_connect())))
+print(paste("Testing using backend", class(td_connect(read_only = FALSE))))
 
 ## Use locally cached version to allow for offline testing
 options(taxadb_default_provider = "itis_test")
+
+td_create("itis_test")
+

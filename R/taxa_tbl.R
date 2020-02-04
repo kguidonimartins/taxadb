@@ -42,6 +42,10 @@ taxa_tbl <- function(
     return(mem_quick_db(tbl_name))
   }
   if (!has_table(tbl_name, db)){
+    ## FIXME: need to have a db connection that is not read-only
+    ## we could simply not pass `db` to this, and let `td_create` create a new connection
+    ## but that breaks the pluggable DB model.
+    ## db@driver@read_only == TRUE, we need to ask user to create db first?
     td_create(provider = provider, schema = schema, version = version, db = db)
   }
   dplyr::tbl(db, tbl_name)

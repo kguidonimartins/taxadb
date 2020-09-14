@@ -63,47 +63,8 @@ td_create <- function(provider = getOption("taxadb_default_provider", "itis"),
                       db = td_connect(dbdir)
                       ){
 
-  if(!dir.exists(dbdir))
-    dir.create(dbdir, FALSE, TRUE)
 
-  recognized_provider <- c(known_providers, "itis_test")
-  if (any(provider == "all")) {
-    provider <- known_providers
-  }
-  stopifnot(all(provider %in% recognized_provider))
-
-  ## supports vectorized schema and provider lists.
-  files <- unlist(lapply(schema, function(s)
-    paste0(s, "_", provider, ".tsv.bz2")))
-  #remove common name tables for providers without common names
-  files <- files[!files %in% paste0(NO_COMMON, ".tsv.bz2")]
-  dest <- file.path(dbdir, paste0(version, "_", files))
-
-  new_dest <- dest
-  new_files <- files
-
-  test_db <- grepl("itis_test", new_files)
-  if(any(test_db)){
-
-    file.copy(from = system.file(file.path("extdata", new_files), package = "taxadb"),
-              to = new_dest[test_db])
-    new_dest <- dest[!test_db]
-    new_files <- files[!test_db]
-  }
-
-  ## can this be removed? should be handled by arkdb
-  if (!overwrite) {
-    drop <- vapply(dest, file.exists, logical(1))
-    new_dest <- dest[!drop]
-    new_files <- files[!drop]
-  }
-
-  if (length(new_files) >= 1L) {
-    ## FIXME eventually these should be Zenodo URLs
-    urls <- providers_download_url(new_files, version)
-    lapply(seq_along(urls), function(i)
-      curl::curl_download(urls[i], new_dest[i]))
-  }
+  dest <- td_download(provider, schema, version, dbdir)
 
   ## silence readr progress bar in arkdb
   progress <- getOption("readr.show_progress")
@@ -122,14 +83,56 @@ td_create <- function(provider = getOption("taxadb_default_provider", "itis"),
   # reset readr progress bar.
   options(readr.show_progress = progress)
 
-  ## Set id as primary key in each table? automatic in modern DBs
-  ## like MonetDB and duckdb
-  # lapply(DBI::dbListTables(db$con), function(table)
-  # glue::glue("ALTER TABLE {table} ADD PRIMARY KEY ({key});",
-  #            table = table, key = "id"))
-
   invisible(dbdir)
 }
+
+
+td_download <- function(provider = getOption("taxadb_default_provider", "itis"),
+                        schema = c("dwc", "common"),
+                        version = latest_version(),
+                        dbdir =  taxadb_dir()
+  ){
+
+    if(!dir.exists(dbdir))
+      dir.create(dbdir, FALSE, TRUE)
+
+    recognized_provider <- c(known_providers, "itis_test")
+    if (any(provider == "all")) {
+      provider <- known_providers
+    }
+    stopifnot(all(provider %in% recognized_provider))
+
+    ## supports vectorized schema and provider lists.
+    files <- unlist(lapply(schema, function(s)
+      paste0(s, "_", provider, ".tsv.bz2")))
+    #remove common name tables for providers without common names
+    files <- files[!files %in% paste0(NO_COMMON, ".tsv.bz2")]
+    dest <- file.path(dbdir, paste0(version, "_", files))
+
+    new_dest <- dest
+    new_files <- files
+
+    ## special case: test database requested:
+    test_db <- grepl("itis_test", new_files)
+    if(any(test_db)){
+      file.copy(from = system.file(file.path("extdata", new_files),
+                                   package = "taxadb"),
+                to = new_dest[test_db])
+      new_dest <- dest[!test_db]
+      new_files <- files[!test_db]
+    }
+
+    if (length(new_files) >= 1L) {
+      ## FIXME eventually these should be Zenodo URLs
+      urls <- providers_download_url(new_files, version)
+      lapply(seq_along(urls), function(i)
+        curl::curl_download(urls[i], new_dest[i]))
+    }
+
+
+    new_dest
+}
+
 
 providers_download_url <- function(files, version = latest_version()){
   paste0("https://github.com/boettiger-lab/taxadb-cache/",
